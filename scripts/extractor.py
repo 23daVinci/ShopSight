@@ -59,7 +59,7 @@ def extract_features(image_path):
 # --- TEST RUN ---
 if __name__ == "__main__":
     # Test with a dummy image if you don't have local data yet
-    test_image_path = "data/images/1163.jpg"
+    test_image_path = "../data/images/1163.jpg"
     
     if not os.path.exists(test_image_path):
         print("Downloading dummy image for testing...")

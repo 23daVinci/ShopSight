@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopSight | Visual Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        .upload-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .upload-card:hover { transform: translateY(-5px); }
+        .preview-img {
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 10px;
+            display: none; /* Hidden by default */
+        }
+        .result-card {
+            border: none;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .result-card:hover {
+            transform: scale(1.03);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .result-img {
+            height: 250px;
+            object-fit: cover;
+            width: 100%;
+        }
+        .score-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hero-section text-center">
+        <div class="container">
+            <h1 class="display-4 fw-bold"><i class="fa-solid fa-shirt"></i> ShopSight</h1>
+            <p class="lead">AI-Powered Visual Search Engine</p>
+            <p class="opacity-75">Upload an image to find similar styles in our inventory.</p>
+        </div>
+    </div>
+
+    <div class="container mb-5">
+        <div class="row justify-content-center">
+            
+            <div class="col-md-5 mb-4">
+                <div class="card upload-card p-4 text-center h-100">
+                    <div class="card-body">
+                        <i class="fa-solid fa-cloud-arrow-up fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Upload Reference Image</h5>
+                        <p class="text-muted small">Supports JPG, PNG</p>
+                        
+                        <input type="file" id="fileInput" class="form-control mb-3" accept="image/*">
+                        
+                        <img id="preview" class="preview-img img-fluid border mb-3">
+                        
+                        <button onclick="searchImages()" class="btn btn-primary w-100 py-2 fw-bold">
+                            <i class="fa-solid fa-magnifying-glass"></i> Find Matches
+                        </button>
+                        
+                        <div id="loading" class="mt-3 d-none">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="small text-muted mt-2">Analyzing vectors...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <h4 class="mb-3 text-secondary">Recommendations</h4>
+                <div id="resultsGrid" class="row g-3">
+                    <div class="col-12 text-center text-muted py-5">
+                        <i class="fa-regular fa-image fa-2x mb-2 opacity-25"></i>
+                        <p>Results will appear here</p>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000";
+
+        // 1. Handle File Selection (Show Preview)
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('preview');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 2. Handle Search
+        async function searchImages() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert("Please select an image first!");
+                return;
+            }
+
+            // UI Updates
+            document.getElementById('loading').classList.remove('d-none');
+            const resultsGrid = document.getElementById('resultsGrid');
+            resultsGrid.innerHTML = ''; // Clear previous results
+
+            // Prepare Data
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Call Backend
+                const response = await fetch(`${API_URL}/search`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                // Render Results
+                if (data.matches && data.matches.length > 0) {
+                    data.matches.forEach(match => {
+                        
+                        // --- FIX START ---
+                        // 1. Get the raw path from DB (e.g., "../data/images/10005.jpg")
+                        const rawPath = match.image_path;
+                        
+                        // 2. Extract just the filename (handles both Windows "\" and Linux "/" slashes)
+                        // This turns "../data/images/10005.jpg" into just "10005.jpg"
+                        const filename = rawPath.replace(/^.*[\\\/]/, '');
+
+                        // 3. Construct the clean URL that matches your FastAPI mount
+                        // FastAPI is serving the 'images' folder at '/images'
+                        const fullImgUrl = `../data/images/${filename}`;
+                        // --- FIX END ---
+
+                        const score = match.score.toFixed(2);
+                        
+                        const cardHtml = `
+                            <div class="col-6 col-md-4">
+                                <div class="card result-card h-100 position-relative">
+                                    <span class="score-badge">Dist: ${score}</span>
+                                    <img src="${fullImgUrl}" class="result-img" alt="Result">
+                                    <div class="card-body p-2 text-center">
+                                        <small class="text-muted text-truncate d-block">${filename}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        resultsGrid.innerHTML += cardHtml;
+                    });
+                }
+
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Failed to connect to the backend.");
+            } finally {
+                document.getElementById('loading').classList.add('d-none');
+            }
+        }
+    </script>
+</body>
+</html>
