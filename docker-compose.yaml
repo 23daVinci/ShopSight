@@ -47,6 +47,7 @@ services:
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
       - TRANSFORMERS_CACHE=/app/cache  # Tell HF where to save
+      - PYTHONUNBUFFERED=1
     depends_on:
       - milvus
     volumes:
