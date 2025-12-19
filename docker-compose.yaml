@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # --- 1. Milvus Vector Database Dependencies ---
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.0
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls=http://0.0.0.0:2379
+    networks:         # <--- ADDED THIS
+      - shopsight-net
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: minio server /minio_data
+    volumes:
+      - milvus_data:/minio_data
+    networks:         # <--- ADDED THIS
+      - shopsight-net
+
+  # --- 2. Milvus Service ---
+  milvus:
+    image: milvusdb/milvus:v2.3.0
+    command: milvus run standalone
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    depends_on:
+      - etcd
+      - minio
+    ports:
+      - "19530:19530"
+    networks:
+      - shopsight-net
+
+  # --- 3. Backend API ---
+  backend:
+    build: ./services
+    ports:
+      - "8000:8000"
+    environment:
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      - TRANSFORMERS_CACHE=/app/cache  # Tell HF where to save
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - milvus
+    volumes:
+      - ./services:/app
+      - ./data:/data
+      - hf_cache:/app/cache
+    networks:
+      - shopsight-net
+
+  # --- 4. Frontend (Nginx) ---
+  frontend:
+    build: ./UI
+    ports:
+      - "8080:80"
+    volumes:
+      - ./UI/index.html:/usr/share/nginx/html/index.html
+      - ./data/images:/usr/share/nginx/html/images
+    networks:
+      - shopsight-net
+
+networks:
+  shopsight-net:
+    driver: bridge
+
+volumes:
+  milvus_data:
+  hf_cache:

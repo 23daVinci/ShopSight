@@ -1,97 +1,124 @@
-import io
-import torch
-from fastapi import FastAPI, UploadFile, File
+import os
+import asyncio
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
-from transformers import ViTImageProcessor, ViTModel
-from pymilvus import connections, Collection
+from contextlib import asynccontextmanager
+from ingest import ShopSightService
 
-# --- CONFIGURATION ---
-MODEL_NAME = 'google/vit-base-patch16-224-in21k'
-COLLECTION_NAME = "ShopSight_Inventory"
-MILVUS_HOST = "localhost"
-MILVUS_PORT = "19530"
+# Config
+MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
+DATA_DIR = "/data/images" 
 
-# --- 1. GLOBAL MODEL LOADING ---
-# Load model into memory ONCE when app starts.
-print("Loading Model...")
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-processor = ViTImageProcessor.from_pretrained(MODEL_NAME)
-model = ViTModel.from_pretrained(MODEL_NAME).to(device)
-model.eval()
+shop_service = ShopSightService(host=MILVUS_HOST)
 
-# --- 2. MILVUS CONNECTION ---
-print("Connecting to Milvus...")
-connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
-collection = Collection(COLLECTION_NAME)
-collection.load() # Ensure collection is in memory
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🚀 Starting ShopSight API...")
+    shop_service.connect()
+    yield
+    print("🛑 Shutting down...")
 
-app = FastAPI(title="ShopSight Visual Search API")
+app = FastAPI(title="ShopSight API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In real production, specify your domain (e.g., "http://myapp.com")
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-def get_embedding(image_bytes):
-    """
-    Helper: Converts raw image bytes -> Vector
-    """
-    try:
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        inputs = processor(images=img, return_tensors="pt")
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-        
-        with torch.no_grad():
-            outputs = model(**inputs)
-            
-        # Return numpy array of the [CLS] token
-        return outputs.last_hidden_state[:, 0, :].cpu().numpy()
-    except Exception as e:
-        print(f"Error processing image: {e}")
-        return None
-
 @app.post("/search")
-async def search_image(file: UploadFile = File(...)):
-    """
-    Endpoint: Upload an image -> Get similar product paths
-    """
-    # 1. Read Image
+async def search_endpoint(file: UploadFile = File(...)):
     contents = await file.read()
-    
-    # 2. Generate Vector
-    query_vector = get_embedding(contents)
-    
-    if query_vector is None:
-        return {"error": "Could not process image"}
+    results = await asyncio.to_thread(shop_service.search, contents)
+    return {"matches": results}
 
-    # 3. Search Milvus
-    search_params = {
-        "metric_type": "L2", 
-        "params": {"nprobe": 10} # Search 10 clusters (faster than searching all)
-    }
-    
-    results = collection.search(
-        data=query_vector, 
-        anns_field="embedding", 
-        param=search_params, 
-        limit=5, # Return top 5 results
-        output_fields=["image_path"] # <--- CRITICAL: Return the filename
-    )
+# --- UPDATED: Ingestion Endpoint ---
+@app.post("/admin/ingest")
+async def ingest_endpoint(
+    background_tasks: BackgroundTasks, 
+    batch_size: int = 50, 
+    max_batches: int = None
+):
+    """
+    Triggers background ingestion with batch control.
+    Params:
+      - batch_size: Number of images per DB insert (default: 50)
+      - max_batches: Stop after inserting this many batches (optional)
+    """
+    if not os.path.exists(DATA_DIR):
+        return {"error": f"Directory {DATA_DIR} not found. Check docker volumes."}
 
-    # 4. Format Results
-    matches = []
-    for hit in results[0]:
-        matches.append({
-            "score": hit.distance, # Lower is better for L2 distance
-            "image_path": hit.entity.get("image_path")
-        })
+    # Pass parameters to the background task
+    background_tasks.add_task(run_ingestion, batch_size, max_batches)
+    
+    msg = f"Ingestion started. Batch Size: {batch_size}, Max Batches: {max_batches if max_batches else 'Unlimited'}."
+    return {"message": msg}
+
+def run_ingestion(batch_size: int = 50, max_batches: int = None):
+    print(f"📦 Scanning {DATA_DIR}...")
+    
+    valid_exts = (".jpg", ".jpeg", ".png", ".webp")
+    # Sort files for deterministic order
+    files = sorted([f for f in os.listdir(DATA_DIR) if f.lower().endswith(valid_exts)])
+    
+    total_files = len(files)
+    if total_files == 0:
+        print("⚠️ No images found to ingest.")
+        return
+
+    print(f"🚀 Starting ingestion. Found {total_files} images.")
+    print(f"⚙️ Config: Batch Size={batch_size}, Max Batches={max_batches if max_batches else 'Unlimited'}")
+
+    current_batch_paths = []
+    current_batch_vectors = []
+    batches_processed = 0
+
+    for i, filename in enumerate(files, 1):
+        file_path = os.path.join(DATA_DIR, filename)
         
-    return {"matches": matches}
+        # Print progress relative to total files
+        print(f"[{i}/{total_files}] Processing {filename}...")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+            
+            vector = shop_service.get_embedding(content)
+            
+            if vector is not None:
+                current_batch_paths.append(filename)
+                current_batch_vectors.append(vector.flatten())
+                
+                # Check if batch is full
+                if len(current_batch_paths) >= batch_size:
+                    _batch_insert(current_batch_paths, current_batch_vectors, batches_processed + 1)
+                    
+                    # Reset batch and increment counter
+                    current_batch_paths, current_batch_vectors = [], []
+                    batches_processed += 1
+                    
+                    # Check exit condition
+                    if max_batches and batches_processed >= max_batches:
+                        print(f"🛑 Max batches limit ({max_batches}) reached. Stopping ingestion.")
+                        return
+
+        except Exception as e:
+            print(f"❌ Error processing {filename}: {e}")
+
+    # Process any remaining images as the final batch
+    # (Only if we haven't hit the max_batches limit yet)
+    if current_batch_paths:
+        _batch_insert(current_batch_paths, current_batch_vectors, batches_processed + 1)
+    
+    print("✅ Ingestion Process Complete.")
+
+def _batch_insert(paths, vectors, batch_num):
+    print(f"💾 [Batch {batch_num}] Inserting {len(paths)} vectors into Milvus...")
+    shop_service.collection.insert([paths, vectors])
+    shop_service.collection.flush()
+    
+    # Re-index to ensure immediate searchability
+    index_params = {"metric_type": "L2", "index_type": "IVF_FLAT", "params": {"nlist": 128}}
+    shop_service.collection.create_index("embedding", index_params)
