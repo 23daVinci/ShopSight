@@ -46,11 +46,13 @@ services:
     environment:
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
+      - TRANSFORMERS_CACHE=/app/cache  # Tell HF where to save
     depends_on:
       - milvus
     volumes:
       - ./services:/app
       - ./data:/data
+      - hf_cache:/app/cache
     networks:
       - shopsight-net
 
@@ -71,3 +73,4 @@ networks:
 
 volumes:
   milvus_data:
+  hf_cache:

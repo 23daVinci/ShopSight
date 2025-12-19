@@ -1,5 +1,6 @@
 import os
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from ingest import ShopSightService  # <--- Import your new class
 
@@ -17,13 +18,22 @@ async def lifespan(app: FastAPI):
     # Shutdown logic (optional)
 
 app = FastAPI(title="ShopSight API", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For production, replace with ["http://localhost:8080"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/search")
 async def search_endpoint(file: UploadFile = File(...)):
+    import asyncio
+
     contents = await file.read()
     
-    # Delegate logic to the service class
-    results = shop_service.search(contents)
+    # Run CPU-bound search in a separate thread
+    results = await asyncio.to_thread(shop_service.search, contents)
     
     return {"matches": results}
 

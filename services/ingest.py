@@ -1,6 +1,7 @@
 # service.py
 import io
 import torch
+import time
 from PIL import Image
 from transformers import ViTImageProcessor, ViTModel
 from pymilvus import connections, utility, Collection, FieldSchema, CollectionSchema, DataType
@@ -23,7 +24,15 @@ class ShopSightService:
     def connect(self):
         """Connects to DB and loads Collection."""
         print(f"🔌 Connecting to Milvus at {self.host}...")
-        connections.connect("default", host=self.host, port=self.port)
+        retry_count = 0
+        while retry_count < 10:
+            try:
+                connections.connect("default", host=self.host, port=self.port)
+                break
+            except Exception:
+                print("⏳ Milvus not ready, retrying in 2s...")
+                time.sleep(2)
+                retry_count += 1
         
         # Check if collection exists; if not, create empty one
         if not utility.has_collection(self.collection_name):
