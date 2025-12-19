@@ -9,7 +9,7 @@ BATCH_SIZE = 64  # PyTorch is often more memory efficient, so we can bump this u
 MODEL_NAME = 'google/vit-base-patch16-224-in21k'
 COLLECTION_NAME = "ShopSight_Inventory"
 IMAGE_FOLDER = "../data/images/*.jpg"
-LIMIT_DATASET = 4400 
+LIMIT_DATASET = 100 
 
 # --- 1. SETUP DEVICE & MODEL ---
 # Automatically detect the fastest available hardware

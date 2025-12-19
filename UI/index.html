@@ -164,7 +164,8 @@
 
                         // 3. Construct the clean URL that matches your FastAPI mount
                         // FastAPI is serving the 'images' folder at '/images'
-                        const fullImgUrl = `../data/images/${filename}`;
+                        //const fullImgUrl = `../data/images/${filename}`;
+                        const fullImgUrl = `/images/${filename}`;
                         // --- FIX END ---
 
                         const score = match.score.toFixed(2);

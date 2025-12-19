@@ -1,0 +1,13 @@
+# UI/Dockerfile
+FROM nginx:alpine
+
+# Remove default nginx static assets
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy our custom Nginx config (we will create this next)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy the static HTML file
+COPY index.html /usr/share/nginx/html/index.html
+
+EXPOSE 80

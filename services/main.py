@@ -1,4 +1,5 @@
 import io
+import os
 import torch
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +10,7 @@ from pymilvus import connections, Collection
 # --- CONFIGURATION ---
 MODEL_NAME = 'google/vit-base-patch16-224-in21k'
 COLLECTION_NAME = "ShopSight_Inventory"
-MILVUS_HOST = "localhost"
+MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
 MILVUS_PORT = "19530"
 
 # --- 1. GLOBAL MODEL LOADING ---
