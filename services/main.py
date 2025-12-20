@@ -11,15 +11,19 @@ DATA_DIR = "/data/images"
 
 shop_service = ShopSightService(host=MILVUS_HOST)
 
+# Startup and Shutdown Events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 Starting ShopSight API...")
     shop_service.connect()
     yield
+    # Add any necessary cleanup here (eg. closing DB connections)
     print("🛑 Shutting down...")
 
+# FastAPI App Initialization
 app = FastAPI(title="ShopSight API", lifespan=lifespan)
 
+# CORS Middleware Setup for cross-origin requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

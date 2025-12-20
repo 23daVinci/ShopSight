@@ -1,11 +1,14 @@
-🛍️ ShopSight: AI-Powered Visual Search EngineShopSight is a visual search engine designed to revolutionize e-commerce product discovery. Instead of relying on text keywords, users can upload an image (e.g., a specific shoe or shirt) to find visually similar items from a product inventory.Powered by Vision Transformers (ViT) and Milvus Vector Database, ShopSight converts images into high-dimensional vector embeddings to perform lightning-fast similarity searches.🚀 Features🔍 Visual Similarity Search: Find products based on visual features (color, pattern, shape) rather than metadata.🧠 Advanced AI Models: Utilizes Google's Vision Transformer (ViT-base-patch16-224) for state-of-the-art feature extraction.⚡ High-Performance Indexing: Uses Milvus for scalable, millisecond-latency vector retrieval.🐳 Microservices Architecture: Fully containerized with Docker for easy deployment and scaling.🔌 RESTful API: Robust FastAPI backend with auto-generated documentation.💻 Interactive UI: Clean, responsive frontend for testing and demonstration.🛠️ Tech StackCore ServicesBackend: Python, FastAPI, UvicornML/AI: PyTorch, HuggingFace Transformers (ViT)Database: Milvus (Vector DB), etcd, MinIOFrontend: HTML5, Bootstrap 5, NginxInfrastructureContainerization: Docker & Docker ComposeData Processing: NumPy, Pillow🏗️ ArchitectureThe system consists of four main containerized services:Frontend (Nginx): Serves the web UI and product images.Backend (FastAPI): Handles API requests, runs the AI inference model, and manages data ingestion.Milvus (Vector DB): Stores and indexes image embeddings for similarity search.MinIO & etcd: Storage and metadata management dependencies for Milvus.🏁 Getting StartedPrerequisitesDocker Desktop installed and running.GitInstallationClone the Repositorygit clone [https://github.com/your-username/ShopSight.git](https://github.com/your-username/ShopSight.git)
-cd ShopSight
-Prepare DataPlace your product images in the data/images directory.mkdir -p data/images
-# Add your .jpg or .png files here
-Start the ApplicationRun the services using Docker Compose:docker-compose up -d --build
-First-time startup may take a few minutes as it downloads the ViT model (~350MB) and initializes Milvus.Access the AppFrontend UI: http://localhost:8080API Docs (Swagger): http://localhost:8000/docs📥 Data IngestionBefore searching, you must index your images. We provide a powerful batch ingestion API.Run IngestionYou can trigger ingestion via the API or command line (cURL).Option 1: Swagger UIGo to http://localhost:8000/docs.Find the POST /admin/ingest endpoint.Click "Try it out" and set parameters (e.g., batch_size: 50).Execute.Option 2: cURL (Command Line)# Ingest all images
-curl -X POST "http://localhost:8000/admin/ingest"
+# 🛍️ ShopSight: AI-Powered Visual Search Engine
 
-# Ingest with limits (e.g., test with first 50 images)
-curl -X POST "http://localhost:8000/admin/ingest?batch_size=10&max_batches=5"
-Check your Docker logs (docker logs -f shopsight-backend-1) to see real-time progress.🖥️ UsageOpen the Frontend at http://localhost:8080.Click "Upload Reference Image".Select an image from your device.Click "Find Matches".The system will display the most visually similar items from your inventory along with a similarity score (lower distance = better match).🤝 ContributingContributions are welcome! Please follow these steps:Fork the project.Create your feature branch (git checkout -b feature/AmazingFeature).Commit your changes (git commit -m 'Add some AmazingFeature').Push to the branch (git push origin feature/AmazingFeature).Open a Pull Request.📄 LicenseDistributed under the MIT License. See LICENSE for more information.📞 ContactNaman LazarusProject Link: https://github.com/your-username/ShopSight
+**ShopSight** is a visual search engine designed to revolutionize e-commerce product discovery. Instead of relying on text keywords, users can upload an image (e.g., a specific shoe or shirt) to find visually similar items from a product inventory.
+
+Powered by Vision Transformers (ViT) and Milvus Vector Database, ShopSight converts images into high-dimensional vector embeddings to perform lightning-fast similarity searches.
+
+🚀 Features
+
+* 🔍 Visual Similarity Search: Find products based on visual features (color, pattern, shape) rather than metadata.
+* 🧠 Advanced AI Models: Utilizes Google's Vision Transformer (ViT-base-patch16-224) for state-of-the-art feature extraction.
+* ⚡ High-Performance Indexing: Uses Milvus for scalable, millisecond-latency vector retrieval.
+* 🐳 Microservices Architecture: Fully containerized with Docker for easy deployment and scaling.
+* 🔌 RESTful API: Robust FastAPI backend with auto-generated documentation.
+* 💻 Interactive UI: Clean, responsive frontend for testing and demonstration.
