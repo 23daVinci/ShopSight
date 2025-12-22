@@ -15,13 +15,13 @@ Powered by Vision Transformers (ViT) and Milvus Vector Database, ShopSight conve
 
 ## 🛠️ Tech Stack
 
-Core Services
+**Core Services**
 * Backend: Python, FastAPI, Uvicorn
 * ML/AI: PyTorch, HuggingFace Transformers (ViT)
 * Database: Milvus (Vector DB), etcd, MinIO
 * Frontend: HTML5, Bootstrap 5, Nginx
 
-Infrastructure
+**Infrastructure**
 * Containerization: Docker & Docker Compose
 * Data Processing: NumPy, Pillow
 
@@ -32,3 +32,17 @@ The system consists of four main containerized services:
 2. Backend (FastAPI): Handles API requests, runs the AI inference model, and manages data ingestion.
 3. Milvus (Vector DB): Stores and indexes image embeddings for similarity search.
 4. MinIO & etcd: Storage and metadata management dependencies for Milvus.
+
+## 🏁 Getting Started
+
+### Prerequisites
+* [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+### Option A: Quick Start (Pre-built Images)
+Use this method to run ShopSight immediately without needing the source code.
+
+1. **Setup Workspace**:
+   Create a folder for the project and a directory for your images:
+   ```bash
+   mkdir -p shopsight/data/images
+   cd shopsight
