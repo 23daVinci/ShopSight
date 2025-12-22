@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.0
+    networks:
+      - shopsight-net
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    volumes:
+      - milvus_data:/minio_data
+    networks:
+      - shopsight-net
+
+  milvus:
+    image: milvusdb/milvus:v2.3.0
+    networks:
+      - shopsight-net
+
+  backend:
+    image: namanlazarus/shopsight-backend:v1
+    
+    ports:
+      - "8000:8000"
+    environment:
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+    volumes:
+      - ./my_images:/data  # They map their local image folder here
+      - hf_cache:/app/cache
+    depends_on:
+      - milvus
+    networks:
+      - shopsight-net
+
+  frontend:
+    image: namanlazarus/shopsight-frontend:v1
+    
+    ports:
+      - "8080:80"
+    volumes:
+      - ./my_images/images:/usr/share/nginx/html/images
+    networks:
+      - shopsight-net
+
+networks:
+  shopsight-net: 
+    driver: bridge
+
+volumes:
+  milvus_data:
+  hf_cache:
